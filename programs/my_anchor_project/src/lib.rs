@@ -1,7 +1,11 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::log::sol_log_data;
+use polymer_prover::cpi::accounts::{LoadProof as PolymerLoadProof, ValidateEvent as PolymerValidateEvent};
+use polymer_prover::instructions::validate_event::ValidateEventResult;
 
 declare_id!("GErKGy2MUyTZgXLxAhpmdThpH39YhJGRbbEkfezL9zNL");
+
+// Polymer Prover Program ID - hardcoded value for the published program
+pub const POLYMER_PROVER_ID: Pubkey = solana_program::pubkey!("CdvSq48QUukYuMczgZAVNZrwcHNshBdtqrjW26sQiGPs");
 
 #[program]
 pub mod my_anchor_project {
@@ -21,47 +25,67 @@ pub mod my_anchor_project {
         logger_account.nonce += 1;
 
         // Method 1: Simple text logging with `msg!`
-        msg!("Key: {}, Value: {}, Nonce: {}", key, value, logger_account.nonce);
-
-        // Method 2: Structured binary logging with `sol_log_data`
-        let log_data = KeyValueLog {
-            key: key.clone(),
-            value: value.clone(),
-            nonce: logger_account.nonce,
-        };
-        let serialized_data = borsh::to_vec(&log_data).unwrap();
-        sol_log_data(&[&serialized_data]);
-
-        // Method 3: Anchor event emission
-        emit!(KeyValueEvent {
-            key: key.clone(),
-            value: value.clone(),
-            nonce: logger_account.nonce,
-        });
-
-        // Call the swap function with the same context
-        swap_and_log(ctx, key, value)?;
+        msg!("Prove: Key: {}, Value: {}, Nonce: {}", key, value, logger_account.nonce);
 
         Ok(())
     }
 
-    // Change from private to public function
-    pub fn swap_and_log(ctx: Context<LogKeyValue>, key: String, value: String) -> Result<()> {
-        let logger_account = &mut ctx.accounts.logger_account;
+    pub fn load_proof(ctx: Context<LoadProof>, proof: Vec<u8>) -> Result<()> {
+        msg!("Loading proof into polymer prover");
         
-        // Increment the nonce again for the swapped values
-        logger_account.nonce += 1;
+        // Call the polymer-prover program to load the proof
+        polymer_prover::cpi::load_proof(
+            CpiContext::new(
+                ctx.accounts.polymer_prover.to_account_info(),
+                PolymerLoadProof {
+                    cache_account: ctx.accounts.cache_account.to_account_info(),
+                    authority: ctx.accounts.authority.to_account_info(),
+                    system_program: ctx.accounts.system_program.to_account_info(),
+                },
+            ),
+            proof,
+        )
+    }
+
+    pub fn validate_proof(ctx: Context<ValidateProof>) -> Result<()> {
+        msg!("Validating proof with polymer prover");
+
+        // Call the polymer-prover program to validate the event
+        polymer_prover::cpi::validate_event(
+            CpiContext::new(
+                ctx.accounts.polymer_prover.to_account_info(),
+                PolymerValidateEvent {
+                    cache_account: ctx.accounts.cache_account.to_account_info(),
+                    authority: ctx.accounts.authority.to_account_info(),
+                    internal: ctx.accounts.internal.to_account_info(),
+                    instructions: ctx.accounts.instructions.to_account_info(),
+                },
+            ),
+        )?;
+
+        // Get the return data from the CPI call
+        let (pid, data) = get_return_data().ok_or(ErrorCode::MissingReturn)?;
+        require_keys_eq!(pid, POLYMER_PROVER_ID, ErrorCode::WrongProgram);
+
+        // Parse the return data as a ValidateEventResult
+        let result = ValidateEventResult::try_from_slice(&data)?;
         
-        // Log the swapped values
-        msg!("Swapped - Key: {}, Value: {}, Nonce: {}", value, key, logger_account.nonce);
-        
-        // Update to use the new event type
-        emit!(KeyValueSwappedEvent {
-            key: value,
-            value: key,
-            nonce: logger_account.nonce,
-        });
-        
+        // Process the result based on its type
+        match result {
+            ValidateEventResult::Valid(chain_id, event) => {
+                msg!(
+                    "Proof validated: chain_id: {}, emitting_contract: {}, topics: {:?}, unindexed_data: {:?}",
+                    chain_id,
+                    event.emitting_contract.to_hex(),
+                    event.topics,
+                    event.unindexed_data
+                );
+            }
+            _ => {
+                msg!("Prover returned error: {}", result);
+            }
+        }
+
         Ok(())
     }
 }
@@ -87,7 +111,6 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// Context for the log_key_value instruction
 #[derive(Accounts)]
 pub struct LogKeyValue<'info> {
     #[account(
@@ -99,26 +122,41 @@ pub struct LogKeyValue<'info> {
     pub signer: Signer<'info>,
 }
 
-// Structured data for `sol_log_data`
-#[derive(borsh::BorshSerialize, borsh::BorshDeserialize)]
-pub struct KeyValueLog {
-    pub key: String,
-    pub value: String,
-    pub nonce: u64,
+#[derive(Accounts)]
+pub struct LoadProof<'info> {
+    /// CHECK: This is the polymer prover program
+    #[account(address = POLYMER_PROVER_ID)]
+    pub polymer_prover: AccountInfo<'info>,
+    /// CHECK: This is the cache account for the proof
+    #[account(mut)]
+    pub cache_account: AccountInfo<'info>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
-// Structured event for Anchor
-#[event]
-pub struct KeyValueEvent {
-    pub key: String,
-    pub value: String,
-    pub nonce: u64,
+#[derive(Accounts)]
+pub struct ValidateProof<'info> {
+    /// CHECK: This is the polymer prover program
+    #[account(address = POLYMER_PROVER_ID)]
+    pub polymer_prover: AccountInfo<'info>,
+    /// CHECK: This is the cache account for the proof
+    #[account(mut)]
+    pub cache_account: AccountInfo<'info>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// CHECK: This is the internal account for the prover
+    #[account(mut)]
+    pub internal: AccountInfo<'info>,
+    /// CHECK: This is the instructions account for the prover
+    #[account(mut)]
+    pub instructions: AccountInfo<'info>,
 }
 
-// Add this event definition after KeyValueEvent
-#[event]
-pub struct KeyValueSwappedEvent {
-    pub key: String,
-    pub value: String,
-    pub nonce: u64,
+#[error_code]
+pub enum ErrorCode {
+    #[msg("Missing return data")]
+    MissingReturn,
+    #[msg("Wrong program returned data")]
+    WrongProgram,
 }
