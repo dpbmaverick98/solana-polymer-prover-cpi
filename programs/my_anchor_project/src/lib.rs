@@ -1,11 +1,15 @@
 use anchor_lang::prelude::*;
-use polymer_prover::cpi::accounts::{LoadProof as PolymerLoadProof, ValidateEvent as PolymerValidateEvent};
+use anchor_lang::solana_program::program::get_return_data;
+use anchor_lang::solana_program::pubkey;
+use polymer_prover::cpi::accounts::{
+    LoadProof as PolymerLoadProof, ValidateEvent as PolymerValidateEvent,
+};
 use polymer_prover::instructions::validate_event::ValidateEventResult;
 
 declare_id!("GErKGy2MUyTZgXLxAhpmdThpH39YhJGRbbEkfezL9zNL");
 
 // Polymer Prover Program ID - hardcoded value for the published program
-pub const POLYMER_PROVER_ID: Pubkey = solana_program::pubkey!("CdvSq48QUukYuMczgZAVNZrwcHNshBdtqrjW26sQiGPs");
+pub const POLYMER_PROVER_ID: Pubkey = pubkey!("CdvSq48QUukYuMczgZAVNZrwcHNshBdtqrjW26sQiGPs");
 
 #[program]
 pub mod my_anchor_project {
