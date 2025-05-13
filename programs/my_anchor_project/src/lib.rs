@@ -1,11 +1,12 @@
 use anchor_lang::prelude::*;
 use polymer_prover::cpi::accounts::{LoadProof as PolymerLoadProof, ValidateEvent as PolymerValidateEvent};
 use polymer_prover::instructions::validate_event::ValidateEventResult;
+use anchor_lang::solana_program::program::get_return_data;
 
-declare_id!("GErKGy2MUyTZgXLxAhpmdThpH39YhJGRbbEkfezL9zNL");
+declare_id!("J8T7Dg51zWifVfd4H4G61AaVtmW7GqegHx3h7a59hKSa");
 
 // Polymer Prover Program ID - hardcoded value for the published program
-pub const POLYMER_PROVER_ID: Pubkey = solana_program::pubkey!("CdvSq48QUukYuMczgZAVNZrwcHNshBdtqrjW26sQiGPs");
+pub const POLYMER_PROVER_ID: Pubkey = anchor_lang::solana_program::pubkey!("CdvSq48QUukYuMczgZAVNZrwcHNshBdtqrjW26sQiGPs");
 
 #[program]
 pub mod my_anchor_project {
@@ -121,7 +122,6 @@ pub struct LogKeyValue<'info> {
     pub logger_account: Account<'info, LoggerAccount>,
     pub signer: Signer<'info>,
 }
-
 #[derive(Accounts)]
 pub struct LoadProof<'info> {
     /// CHECK: This is the polymer prover program
@@ -147,10 +147,11 @@ pub struct ValidateProof<'info> {
     pub authority: Signer<'info>,
     /// CHECK: This is the internal account for the prover
     #[account(mut)]
-    pub internal: AccountInfo<'info>,
+    pub internal: UncheckedAccount<'info>,
     /// CHECK: This is the instructions account for the prover
-    #[account(mut)]
-    pub instructions: AccountInfo<'info>,
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub instructions: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[error_code]
@@ -160,3 +161,4 @@ pub enum ErrorCode {
     #[msg("Wrong program returned data")]
     WrongProgram,
 }
+

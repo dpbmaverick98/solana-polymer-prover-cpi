@@ -14,8 +14,8 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
+idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
-anchor-lang = "0.28.0"
-solana-program = "1.16.0"
+anchor-lang = "0.31.1"
 polymer-prover = { git = "https://github.com/polymerdao/solana-prover-contracts", tag = "v0.5.3", features = ["cpi"] }
