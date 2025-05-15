@@ -1,8 +1,29 @@
+# Node modules and packages
+node_modules/
+.npm
+yarn-error.log
+
+# Solana program build files
+target/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Proof files (these can be large and are specific to each run)
+proof-*.json
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
 
 .anchor
-.DS_Store
-target
 **/*.rs.bk
-node_modules
 test-ledger
 .yarn
