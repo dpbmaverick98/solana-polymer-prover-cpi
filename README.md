@@ -1,150 +1,119 @@
-Here's the well-structured README.md file:
+# Solana Polymer Prover CPI Demo
 
-```markdown
-# Key-Value Logger Solana Program
-
-A Solana program built with Anchor that demonstrates different logging methods through key-value pair operations. Includes a TypeScript client for interaction and event monitoring.
-
-![Solana Logo](https://solana.com/favicon.ico) ![Anchor Logo](https://anchorlang.com/_next/image?url=%2Flogo.png&w=128&q=75)
+This repository demonstrates how to generate cross-chain proofs of Solana program logs using Polymer Prover and verify them on EVM chains.
 
 ## Overview
 
-This program showcases three logging methodologies on Solana:
-1. Simple text logging with `msg!`
-2. Structured binary logging with `sol_log_data`
-3. Anchor's structured events with `emit!`
+This project showcases:
 
-Features:
-- Stores operation count in a Program Derived Address (PDA)
-- Swaps key/value pairs in subsequent operations
-- Provides comprehensive TypeScript client integration
-- Supports real-time event monitoring
+1. A Solana program that emits logs with a specific "Prove:" prefix
+2. A client application to request state proofs from Polymer's API
+3. A verification tool to validate these proofs on EVM chains (Base Sepolia)
 
 ## Project Structure
 
-```text
-my_anchor_project/
-├── programs/
-│   └── my_anchor_project/
-│       └── src/
-│           └── lib.rs         # Program logic
-├── app/
-│   └── key-value-client.ts    # TS client implementation
-├── migrations/
-│   ├── deploy.ts              # Deployment scripts
-│   ├── fetchTxData.js         # Transaction inspector
-│   └── solListener.js         # Event listener
-├── target/
-│   └── idl/
-│       └── my_anchor_project.json  # Generated IDL
-├── Anchor.toml                # Config
-├── Cargo.toml                 # Rust dependencies
-└── README.md                  # Documentation
-```
+- `/programs/my_anchor_project/src/lib.rs`: The Solana program that emits provable logs
+- `/app/simple-key-value-client.ts`: Client for emitting key-value logs on Solana
+- `/app/request-proof.ts`: Client for requesting proofs from Polymer API
+- `/app/validate-evm-proof.ts`: Client for validating proofs on EVM chains
+- `/app/validate-proof-client.ts`: Client for validating proofs on Solana (alternative approach)
 
 ## Prerequisites
 
-- [Rust](https://rustup.rs/) (v1.65.0+)
-- [Solana CLI](https://docs.solana.com/cli/install-solana-cli-tools) (v1.18.4+)
-- [Anchor CLI](https://www.anchor-lang.com/docs/installation)
-- Node.js (v18.x+)
-- npm/yarn
+- Solana CLI and Rust toolchain
+- Node.js and npm/yarn
+- Access to Solana Devnet
+- Access to Base Sepolia testnet (for EVM verification)
+- Polymer API key
 
-## 🚀 Quick Start
+## Setup
 
-1. Clone repository & install dependencies:
+1. Install dependencies:
 ```bash
-git clone https://github.com/your-username/my_anchor_project.git
-cd my_anchor_project
 npm install
 ```
 
-2. Set up Solana devnet environment:
-```bash
-solana config set --url devnet
-solana-keygen new
-```
-
-3. Build and deploy:
+2. Build the Solana program:
 ```bash
 anchor build
-anchor deploy
 ```
 
-4. Run client with test data:
+3. Deploy to devnet:
 ```bash
-node app/key-value-client.js "temperature" "23.5°C"
+anchor deploy --provider.cluster devnet
 ```
 
-## Program Instructions
+## Usage
 
-### `initialize`
-- Creates PDA with seed "logger"
-- Sets initial nonce to 0
+### 1. Emit a key-value log on Solana
 
-### `log_key_value`
-1. Accepts key/value pair (max 32 bytes each)
-2. Increments nonce
-3. Logs data using all three methods
-4. Triggers `swap_and_log` with swapped values
+```bash
+ts-node app/simple-key-value-client.ts "solana" "hello"
+```
 
-## 📊 Logging Comparison
+This will:
+- Initialize a logger account if needed
+- Emit a log in the format: `Prove: Key: solana, Value: hello, Nonce: X`
+- Return a transaction signature/ID
 
-| Method              | Format         | Size Limit | Decoding                   | Use Case                |
-|---------------------|----------------|------------|----------------------------|-------------------------|
-| `msg!`              | Plain text     | 512 bytes  | Direct read                | Simple debugging        |
-| `sol_log_data`      | Binary         | 10KB       | Manual deserialization     | Structured large data   |
-| Anchor Events       | JSON (IDL)    | 10KB       | Automatic via client       | Production applications |
+### 2. Request a proof from Polymer API
 
-## Event Types
+```bash
+ts-node app/request-proof.ts YOUR_TX_SIGNATURE PROGRAM_ID
+```
 
+For example:
+```bash
+ts-node app/request-proof.ts 5r4AtXVBkcDmxtBay7RCpNnGCMv4RzX4Z5yqP2axMTzYY85Q3Tt3PKGtdk3m4Sqsfy7rCAb2Qp1F9rGs3xAdbo8C J8T7Dg51zWifVfd4H4G61AaVtmW7GqegHx3h7a59hKSa
+```
+
+This will:
+- Request a proof from Polymer's API
+- Poll until the proof is ready
+- Save the proof to a file (e.g., `proof-167462.json`)
+
+### 3. Verify the proof on an EVM chain
+
+```bash
+ts-node app/validate-evm-proof.ts proof-167462.json
+```
+
+This will:
+- Connect to the Base Sepolia testnet
+- Convert the base64 proof to hex format
+- Verify the proof using Polymer's validator contract
+- Display the validated log messages
+
+## Key Components
+
+### 1. Emitting Provable Logs
+
+In your Solana program, use the format:
 ```rust
-// Original submission
-struct KeyValueEvent {
-    key: String,
-    value: String,
-    nonce: u64,
-}
-
-// After swap operation
-struct KeyValueSwappedEvent {
-    swapped_key: String,
-    swapped_value: String,
-    nonce: u64,
-}
+msg!("Prove: Key: {}, Value: {}, Nonce: {}", key, value, nonce);
 ```
 
-## Client API
+The "Prove:" prefix is required for logs to be provable.
 
-```typescript
-interface KeyValueClient {
-  initialize(): Promise<TransactionSignature>;
-  logKeyValue(key: string, value: string): Promise<TransactionSignature>;
-  subscribeToLogs(callback: (log: any) => void): void;
-  decodeBinaryLog(data: string): { key: string; value: string; nonce: number };
-}
-```
+### 2. Polymer API Configuration
 
-## Monitoring Tools
+The proof request API uses:
+- URL: `https://proof.testnet.polymer.zone`
+- API Key: Set in the `request-proof.ts` file or passed as an argument
 
-### Real-time Listener
-```bash
-node migrations/solListener.js
-```
+### 3. EVM Validator Contract
 
-### Transaction Inspector
-```bash
-node migrations/fetchTxData.js 5VERv8NMvzbJMEkV8xnrLkEaWRtSz9ChKDcpq3Mxcs3poaH9g4KdYL4iPEgfQ25238huKGnMHCUnmN4VbSv7nD9
-```
+The validator contract on Base Sepolia:
+- Address: `0xabC91c12Bda41BCd21fFAbB95A9e22eE18C4B513`
+- Function: `validateSolLogs(bytes calldata proof)`
 
-## EVM Developer Notes
+## Security Considerations
 
-1. **Account Model**: Unlike EVM's contract storage, Solana requires explicit account passing
-2. **PDAs**: Program-controlled addresses (no private keys) for deterministic account access
-3. **Log Limits**: Maximum 10KB per log entry across all methods
-4. **Gas Costs**: Logging impacts compute units - binary logs are most efficient
+- Only finalized Solana transactions can be proved
+- Proofs are valid for a limited time period
+- The program ID emitting the logs must match the one used in the proof request
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) for details
+MIT
 
