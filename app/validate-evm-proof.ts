@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // EVM Chain Configuration
-const EVM_RPC_URL = 'https://base-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_API_KEY';
+const EVM_RPC_URL = 'https://base-sepolia.g.alchemy.com/v2/Jtbf7OFzzUjJb8RTdJ9tfHJ_F90hiGew';
 const PROVER_ADDRESS = '0xabC91c12Bda41BCd21fFAbB95A9e22eE18C4B513';
 
 // ABI for the validateSolLogs function
