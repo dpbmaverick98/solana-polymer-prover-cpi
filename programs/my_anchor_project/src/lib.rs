@@ -25,8 +25,12 @@ pub mod my_anchor_project {
         // Increment the nonce
         logger_account.nonce += 1;
 
-        // Method 1: Simple text logging with `msg!`
-        msg!("Prove: Key: {}, Value: {}, Nonce: {}", key, value, logger_account.nonce);
+        // Get the actual runtime program ID
+        let program_id = ctx.program_id;
+
+        // Emit properly formatted log with "Prove:" prefix and program ID
+        msg!("Prove: program: {}, EVENT_NAME: {}, Key: {}, Value: {}, Nonce: {}", 
+             program_id, "KEY_VALUE_LOG", key, value, logger_account.nonce);
 
         Ok(())
     }
@@ -160,5 +164,7 @@ pub enum ErrorCode {
     MissingReturn,
     #[msg("Wrong program returned data")]
     WrongProgram,
+    #[msg("Program ID mismatch")]
+    ProgramIdMismatch,
 }
 
